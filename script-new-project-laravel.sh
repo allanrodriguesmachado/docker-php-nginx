@@ -4,4 +4,4 @@ echo ""
 echo ""
 echo "Digite o nome da nova aplicação(sem espaços em branco) Laravel:"
 read app_name
-composer create-project laravel/laravel .
+composer create-project laravel/laravel ./$app_name
