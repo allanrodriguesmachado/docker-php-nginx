@@ -1,45 +1,66 @@
-# Author: Allan Rodrigues
-# Email: allan.rodrigues14@hotmail.com
+# Argumentos da Imagem
+## Versão da Imagem Docker PHP
+ARG PHP_VERSION=8.0.19-fpm
+FROM php:${PHP_VERSION}
 
-# Build arguments
-FROM php:8.3-fpm
+## Diretório da aplicação
+ARG APP_DIR=/var/www
+## Versão da Lib do Redis para PHP
+ARG REDIS_LIB_VERSION=5.3.7
 
-# Directory app - Padrão NGINX
-WORKDIR /var/www
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends \
+    apt-utils
+### apt-utils é um extensão de recursos do gerenciador de pacotes APT
 
-# Atualiza a lista de pacotes e instala apt-utils
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    apt-utils \
-    supervisor \
+RUN apt-get install -y --no-install-recommends supervisor
+COPY ./docker/supervisord/supervisord.conf /etc/supervisor
+COPY ./docker/supervisord/conf /etc/supervisord.d/
+### Supervisor permite monitorar e controlar vários processos (LINUX)
+### Bastante utilizado para manter processos em Daemon, ou seja, executando em segundo plano
+
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+
+# dependências recomendadas de desenvolvido para ambiente linux
+RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     libzip-dev \
     unzip \
     libpng-dev \
     libpq-dev \
-    libxml2-dev \
-    nginx \
-    curl
+    libxml2-dev
 
-# Instala a última versão do Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN docker-php-ext-install mysqli pdo pdo_mysql pdo_pgsql pgsql session xml
 
-# Instala as extensões do PHP
-RUN docker-php-ext-install mysqli pdo pdo_mysql pdo_pgsql pgsql session xml zip iconv simplexml pcntl gd fileinfo
+# habilita instalação do Redis
+RUN pecl install redis-${REDIS_LIB_VERSION} \
+    && docker-php-ext-enable redis
 
-# Instala o Composer
+# Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Copia as configurações do Supervisor
-COPY ./docker/supervisord/supervisord.conf /etc/supervisor
-COPY ./docker/supervisord/conf /etc/supervisord.d/
 
-# Carrega a configuração padrão do NGINX
+RUN docker-php-ext-install zip iconv simplexml pcntl gd fileinfo
+
+#COPY php.ini-production /usr/local/etc/php/php.ini
+RUN cp /usr/local/etc/php/php.ini-production /usr/local/etc/php/php.ini
+
+WORKDIR $APP_DIR
+RUN cd $APP_DIR
+
+RUN chmod 755 -R *
+RUN chown -R www-data: *
+
+RUN apt install nginx -y
+
+# carragar configuração padrão do NGINX
 COPY ./docker/nginx/nginx.conf /etc/nginx/nginx.conf
+# se for necessário criar os sites disponíveis já na confecção da imagem, então descomente a linha abaixo
+# COPY ./docker/nginx/sites /etc/nginx/sites-available
 
-# Limpa arquivos temporários
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Comando para iniciar o Supervisor
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

@@ -1,16 +1,15 @@
 version: "1.0"
 services:
   web:
-    image: allanrodriguesmachado/php-nginx-node-latest
+    image: allanrodriguesmachado/php-nginx-node:latest
     build:
       context: .
       dockerfile: ./Dockerfile
     networks:
       - net_principal
-    working_dir: /var/www
     volumes:
       - .:/var/www
-      - ./docker/nginx/conf:/etc/nginx/conf.d
+      - ./docker/nginx/sites:/etc/nginx/sites-available
     ports:
       - "80:80"
 networks:
